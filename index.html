@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Đọc Thành Tiếng</title>
+    <style>
+        .read {
+            color: red; /* Màu của chữ đã đọc */
+            font-weight: bold; /* Độ đậm cho chữ đã đọc */
+        }
+    </style>
+</head>
+<body>
+    <h1>Nhập văn bản để đọc thành tiếng</h1>
+    
+    <textarea id="text-input" rows="5" cols="50" placeholder="Nhập văn bản tiếng Việt..."></textarea><br>
+
+    <label for="voice-select">Chọn giọng đọc: </label>
+    <select id="voice-select"></select><br>
+
+    <label for="speed-control">Tốc độ đọc: </label>
+    <input type="range" id="speed-control" min="0.5" max="2" value="1.5" step="0.1">
+    <span id="speed-value">1.5</span><br>
+
+    <button onclick="readText()">Đọc Văn Bản</button>
+    <button onclick="togglePause()">Tạm Dừng/Chạy Tiếp</button>
+
+    <h2>Nội dung:</h2>
+    <div id="remaining-text" style="border: 1px solid #ccc; padding: 10px; min-height: 50px;"></div>
+    
+    <script>
+        let speech, text = '', speed = 1.5, voices = [];
+        let currentIndex = 0; // Chỉ số hiện tại trong văn bản
+        let isPaused = false, isPlaying = false; // Biến tạm dừng chung
+        let lastSpokenIndex = 0; // Chỉ số lưu lại lần cuối cùng đọc đến đâu
+
+        // Lấy danh sách giọng đọc
+        function loadVoices() {
+            voices = window.speechSynthesis.getVoices();
+            const voiceSelect = document.getElementById('voice-select');
+            voiceSelect.innerHTML = ''; // Làm trống danh sách giọng
+
+            // Thêm giọng đọc tiếng Việt và tiếng Anh
+            voices.forEach((voice, i) => {
+                if (voice.lang === 'vi-VN' || voice.lang === 'en-US') {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.textContent = `${voice.name} (${voice.lang})`;
+                    voiceSelect.appendChild(option);
+
+                    if (voice.name.includes('Vietnam')) {
+                        voiceSelect.value = i; // Đặt giọng mặc định
+                    }
+                }
+            });
+        }
+
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+
+        function readText() {
+            text = document.getElementById('text-input').value;
+            currentIndex = 0; 
+            lastSpokenIndex = 0; 
+            document.getElementById('remaining-text').innerHTML = text; 
+            isPaused = false;
+            isPlaying = true;
+            speakText();
+        }
+
+        function speakText() {
+            if (!isPlaying || currentIndex >= text.length) return; 
+
+            window.speechSynthesis.cancel(); 
+            speech = new SpeechSynthesisUtterance(text.slice(currentIndex));
+            speech.lang = 'vi-VN';
+            speech.rate = speed;
+
+            speech.voice = voices[document.getElementById('voice-select').value];
+
+            speech.addEventListener('boundary', e => {
+                const charIndex = currentIndex + e.charIndex; 
+                if (charIndex > lastSpokenIndex) {
+                    const spokenText = text.slice(0, charIndex); 
+                    const remainingText = text.slice(charIndex); 
+
+                    document.getElementById('remaining-text').innerHTML = 
+                        `<span class="read">${spokenText}</span>${remainingText}`;
+
+                    lastSpokenIndex = charIndex; 
+                }
+            });
+
+            speech.addEventListener('end', () => {
+                if (currentIndex >= text.length) {
+                    isPlaying = false;
+                }
+            });
+
+            window.speechSynthesis.speak(speech);
+        }
+
+        function togglePause() {
+            if (isPaused) {
+                isPaused = false;
+                isPlaying = true;
+                currentIndex = lastSpokenIndex; 
+                speakText(); 
+            } else if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.pause();
+                isPaused = true;
+            } else {
+                isPlaying = true;
+                speakText();
+            }
+        }
+
+        document.getElementById('speed-control').addEventListener('input', function() {
+            speed = this.value;
+            document.getElementById('speed-value').textContent = speed;
+            if (!isPaused && isPlaying) {
+                togglePause();
+            }
+        });
+
+        document.getElementById('voice-select').addEventListener('change', function() {
+            if (!isPaused && isPlaying) {
+                togglePause();
+            }
+        });
+    </script>
+</body>
+</html>
